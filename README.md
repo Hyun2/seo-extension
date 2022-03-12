@@ -1,46 +1,98 @@
-# Getting Started with Create React App
+![](https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2FdXc7aY%2FbtrvL5jxqMf%2F6uOTqd4XlkhO4Yhk6RqLt0%2Fimg.png)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### Chrome API
 
-## Available Scripts
+extension과 현재 브라우저의 탭에서 방문 중인 웹 사이트 간 인터렉션을 위해 필요합니다.
 
-In the project directory, you can run:
+### Content scripts
 
-### `npm start`
+웹 페이지의 컨텍스트에서 실행되고 DOM 엘리먼트, 객체 및 메서드에 전체 엑세스 권한이 있는 js 파일입니다. 
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Messaging passing API를 이용해서 react로 만든 extension과 컨텐츠 스크립트가 인터렉션할 수 있습니다.
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+![](https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2Fbmme33%2FbtrvLJnr9oT%2Fv8n4eLfeOAMGCnKj2BQpdk%2Fimg.png)
 
-### `npm test`
+메세징 API와 인터렉션하기 위해서 3가지 사항이 필요합니다.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1\. Access to the Chrome API
 
-### `npm run build`
+2\. Permissions
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+3\. Content scripts
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+#### Access to the Chrome API
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+타입스크립트에서는 @types/chrome 를 설치합니다.
 
-### `npm run eject`
+```sh
+npm install @types/chrome --save-dev
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+#### Permissions
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+manifest.json 파일에 현재 탭에 대한 권한을 추가합니다.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+```json
+"permissions": [
+   "activeTab"
+],
+```
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+#### Content scripts 
 
-## Learn More
+타입스크립트를 이용해 content scripts를 작성하기 위해서 craco 를 설치합니다. 
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+craco 를 사용하면 CRA 설정을 eject 없이 쉽게 커스터마이징할 수 있습니다.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```sh
+npm install @craco/craco --save
+```
+
+```js
+// craco.config.js
+
+module.exports = {
+   webpack: {
+       configure: (webpackConfig, {env, paths}) => {
+           return {
+               ...webpackConfig,
+               entry: {
+                   main: [env === 'development' && require.resolve('react-dev-utils/webpackHotDevClient'),paths.appIndexJs].filter(Boolean),
+                   content: './src/chromeServices/DOMEvaluator.ts',
+               },
+               output: {
+                   ...webpackConfig.output,
+                   filename: 'static/js/[name].js',
+               },
+               optimization: {
+                   ...webpackConfig.optimization,
+                   runtimeChunk: false,
+               }
+           }
+       },
+   }
+}
+```
+
+빌드 명령어를 craco를 사용하도록 변경해줍니다.
+
+```json
+"build": "INLINE_RUNTIME_CHUNK=false craco build",
+```
+
+content scripts를 찾을 위치를 chrome에게 알려주기 위해 manifest.json 파일에 코드를 추가합니다.
+
+```json
+"content_scripts": [
+   {
+       "matches": ["http://*/*", "https://*/*"],
+       "js": ["./static/js/content.js"]
+   }
+],
+```
+
+위와 같은 설정을 하면 크롬에서 content.js 파일을 모든 웹 사이트에 주입시켜 줍니다.
+
+### 참고
+
+[https://blog.logrocket.com/creating-chrome-extension-react-typescript/](https://blog.logrocket.com/creating-chrome-extension-react-typescript/)
